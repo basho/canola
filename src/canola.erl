@@ -1,4 +1,6 @@
-%% Copyright (c) 2013 Basho Technologies, Inc.  All Rights Reserved.
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2013-2017 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -13,41 +15,73 @@
 %% KIND, either express or implied.  See the License for the
 %% specific language governing permissions and limitations
 %% under the License.
+%%
+%% -------------------------------------------------------------------
 
+%%
+%% @doc Erlang Wrapper for Pluggable Authentication Modules (PAM).
+%%
+%% @reference X/Open Single Sign-On Service (XSSO) - Pluggable Authentication Modules<br />
+%%  [http://pubs.opengroup.org/onlinepubs/8329799/]
+%%
 -module(canola).
 
--export([open/0, open_debug/0, auth/4, close/1]).
+-export([auth/3]).
 
-%% API
-open() ->
-    open2(false).
+-ifdef(BASHO_CHECK).
+%% Dialyzer and XRef won't recognize 'on_load' as using the function and
+%% will complain about it.
+-export([init_nif_lib/0]).
+-endif.
+-on_load(init_nif_lib/0).
 
-open_debug() ->
-    open2(true).
+-define(APPLICATION, canola).
 
-auth(Username, Password, Service, Port) when is_binary(Username), is_binary(Password),
-                                             is_binary(Service), is_port(Port) ->
-    port_command(Port, term_to_binary({Username, Password, Service})),
-    receive
-        {Port, {data, "+OK"}} ->
-            ok;
-        {Port, {data, "-ERR"}} ->
-            error;
-        {Port, {exit_status, _}} ->
-            erlang:error(badarg)
-    end.
+%% ===================================================================
+%% Public API
+%% ===================================================================
 
-close(Port) ->
-    port_close(Port).
+%%
+%% @doc Attempt to authenticate the specified User for the specified Service.
+%%
+%% If the User is authenticated successfully `ok' is returned.
+%%
+%% On failure, errors are classified as `auth' or `system'.
+%% Generally, if the first element of the error Reason is `auth', the call
+%% was successful but the credentials are not valid, and if the fist element
+%% is `system' an error occurred processing the request. In the latter case,
+%% it's likely that PAM is not properly configured on the system.
+%%
+%% The third element of an `error' Reason tuple identifies the location within
+%% the implementation code where the failure was identified, and is of limited
+%% value to users.
+%%
+-spec auth(Service :: binary(), User :: binary(), Password :: binary())
+            -> ok | {error, {auth | system, Reason :: string(), Loc :: pos_integer()}}.
 
-%% Internal functions
+auth(_Service, _Username, _Password) ->
+    erlang:nif_error(nif_not_loaded).
 
-open2(Debug) ->
-    Args = case Debug of
-               true ->
-                   ["-d"];
-               _ ->
-                   []
-           end,
-    Dir = filename:dirname(code:which(?MODULE)),
-    open_port({spawn_executable, Dir++"/../priv/canola-port"}, [{args, Args}, {packet, 4}, exit_status]).
+%% ===================================================================
+%% NIF initialization
+%% ===================================================================
+
+init_nif_lib() ->
+    SoDir = case code:priv_dir(?APPLICATION) of
+        {error, bad_name} ->
+            ADir =  case code:which(?MODULE) of
+                Beam when is_list(Beam) ->
+                    filename:dirname(filename:dirname(Beam));
+                _ ->
+                    {ok, CWD} = file:get_cwd(),
+                    % This is almost certainly wrong, but it'll end
+                    % up equivalent to "../priv".
+                    filename:dirname(CWD)
+            end,
+            filename:join(ADir, "priv");
+        PDir ->
+            PDir
+    end,
+    % AppEnv = [{debug, {file, "/tmp/canola.log"}}],
+    AppEnv = application:get_all_env(?APPLICATION),
+    erlang:load_nif(filename:join(SoDir, ?APPLICATION), AppEnv).
