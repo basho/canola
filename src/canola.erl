@@ -51,5 +51,15 @@ open2(Debug) ->
                _ ->
                    []
            end,
-    Dir = filename:dirname(code:which(?MODULE)),
-    open_port({spawn_executable, Dir++"/../priv/canola-port"}, [{args, Args}, {packet, 4}, exit_status]).
+    PortBin = case code:priv_dir(ebloom) of
+                 {error, bad_name} ->
+                     case code:which(?MODULE) of
+                         Filename when is_list(Filename) ->
+                             filename:join([filename:dirname(Filename),"../priv", "canola-port"]);
+                         _ ->
+                             filename:join("priv", "canola-port")
+                     end;
+                 Dir ->
+                     filename:join(Dir, "canpola-port")
+             end,
+    open_port({spawn_executable, PortBin}, [{args, Args}, {packet, 4}, exit_status]).
