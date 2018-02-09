@@ -35,7 +35,9 @@ auth(Username, Password, Service, Port) when is_binary(Username), is_binary(Pass
             error;
         {Port, {exit_status, _}} ->
             erlang:error(badarg)
-    end.
+    end;
+auth(_, _, _, _) ->
+    erlang:error(badarg).
 
 close(Port) ->
     port_close(Port).
