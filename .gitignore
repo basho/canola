@@ -1,4 +1,5 @@
 *.o
+*.d
 ebin
 priv/canola-port
 _build
