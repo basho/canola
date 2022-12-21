@@ -35,12 +35,14 @@ auth_test_() ->
         FakeSvc = <<"ThereShouldntBeAServiceWithThisName">>,
         RealSvc = <<"login">>,
         FakeUsr = <<"NoSuchUserWeHope">>,
-        UsrName = case os:getenv("USER") of
-            false ->
-                os:getenv("LOGNAME");
-            Name ->
-                Name
-        end,
+        UsrName = 
+            case os:getenv("USER") of
+                false ->
+                    os:getenv("LOGNAME");
+                Name ->
+                    Name
+            end,
+        io:format(user, "Fetched username of ~p~n" , [UsrName]),
         P = canola:open_debug(),
         ?assert(erlang:is_list(UsrName)),
         RealUsr = erlang:list_to_binary(UsrName),
