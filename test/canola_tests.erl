@@ -22,12 +22,14 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-%%
-%% If there's a known account in PAM on your local system for testing,
-%% define this to the service, username, and password for a live test.
-%% DO NOT commit a dependency on your local configuration!
-%%
-% -define(TEST_LOCAL_USER, {<<"cups">>, <<"guest">>, <<"">>}).
+
+-ifdef(GITHUBEXCLUDE).
+
+user_test() ->
+    P = canola:open_debug(),
+    canola:close(P).
+
+-else.
 
 auth_test_() ->
     {timeout, 30, fun() ->
@@ -42,7 +44,6 @@ auth_test_() ->
                 Name ->
                     Name
             end,
-        io:format(user, "Fetched username of ~p~n" , [UsrName]),
         P = canola:open_debug(),
         ?assert(erlang:is_list(UsrName)),
         RealUsr = erlang:list_to_binary(UsrName),
@@ -67,12 +68,4 @@ auth_test_() ->
         canola:close(P)
     end}.
 
--ifdef(TEST_LOCAL_USER).
-
-user_test() ->
-    P = canola:open_debug(),
-    {Service, Username, Password} = ?TEST_LOCAL_USER,
-    ?assertEqual(ok, canola:auth(Service, Username, Password, P)),
-    canola:close(P).
-
--endif. % TEST_USER_NAME_PASS
+-endif.
